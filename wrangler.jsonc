@@ -12,9 +12,19 @@
 	},
 	"triggers": {
 		"crons": [
-			"* * * * *"
+			"* 16 * * *"
 		]
-	}
+	},
+	"kv_namespaces": [
+		{
+			"binding": "APPS_STORE",
+			"id": "c8d735fa7cc3480eb211e594bd9e2d6d"
+		}
+	],
+	"vars": {
+		"KEYWORDS": "cash,loan,peso,pera,credit,lending",
+		"API_URL": "https://playapi.yuandao.world/api/apps/?collection=TOP_FREE&category=FINANCE&country=ph"
+	},
 	/**
 	 * Smart Placement
 	 * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement

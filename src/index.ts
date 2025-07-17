@@ -1,40 +1,74 @@
-/**
- * Welcome to Cloudflare Workers!
- *
- * This is a template for a Scheduled Worker: a Worker that can run on a
- * configurable interval:
- * https://developers.cloudflare.com/workers/platform/triggers/cron-triggers/
- *
- * - Run `npm run dev` in your terminal to start a development server
- * - Run `curl "http://localhost:8787/__scheduled?cron=*+*+*+*+*"` to see your Worker in action
- * - Run `npm run deploy` to publish your Worker
- *
- * Bind resources to your Worker in `wrangler.jsonc`. After adding bindings, a type definition for the
- * `Env` object can be regenerated with `npm run cf-typegen`.
- *
- * Learn more at https://developers.cloudflare.com/workers/
- */
+interface Env {
+  APPS_STORE: KVNamespace;
+  API_KEY: string;
+  API_URL: string;
+  KEYWORDS: string;
+}
+
+interface AppItem {
+  appId: string;
+  title: string;
+}
+
+interface ApiResponse {
+  results: AppItem[];
+}
 
 export default {
-	async fetch(req) {
-		const url = new URL(req.url);
-		url.pathname = '/__scheduled';
-		url.searchParams.append('cron', '* * * * *');
-		return new Response(`To test the scheduled handler, ensure you have used the "--test-scheduled" then try running "curl ${url.href}".`);
-	},
+  async fetch(request: Request, env: Env): Promise<Response> {
+    return new Response("Use scheduled trigger");
+  },
 
-	// The scheduled handler is invoked at the interval set in our wrangler.jsonc's
-	// [[triggers]] configuration.
-	async scheduled(event, env, ctx): Promise<void> {
-		// A Cron Trigger can make requests to other endpoints on the Internet,
-		// publish to a Queue, query a D1 Database, and much more.
-		//
-		// We'll keep it simple and make an API call to a Cloudflare API:
-		let resp = await fetch('https://api.cloudflare.com/client/v4/ips');
-		let wasSuccessful = resp.ok ? 'success' : 'fail';
+  async scheduled(
+    event: ScheduledEvent,
+    env: Env,
+    ctx: ExecutionContext
+  ): Promise<void> {
+    try {
+      // 解析关键词配置
+      const keywords = env.KEYWORDS.split(',').map(k => k.toLowerCase());
 
-		// You could store this result in KV, write to a D1 Database, or publish to a Queue.
-		// In this template, we'll just log the result:
-		console.log(`trigger fired at ${event.cron}: ${wasSuccessful}`);
-	},
-} satisfies ExportedHandler<Env>;
+      // 请求应用列表
+      const response = await fetch(env.API_URL, {
+        headers: { "x-api-key": env.API_KEY }
+      });
+
+      if (!response.ok) throw new Error(`API Error: ${response.status}`);
+
+      const data: ApiResponse = await response.json();
+      const matchedApps = data.results.filter(app =>
+        keywords.some(keyword =>
+          app.title.toLowerCase().includes(keyword)
+        )
+      );
+
+      console.log(`Matched ${matchedApps.length} apps`);
+
+      // 批量写入KV
+      const batch = matchedApps.map(app => ({
+        key: app.appId,
+        value: JSON.stringify({
+          package_name: app.appId,
+          app_name: app.title
+        })
+      }));
+
+      await writeToKV(env.APPS_STORE, batch);
+      console.log("Data saved successfully");
+    } catch (error) {
+      console.error(`Error: ${error.message}`);
+    }
+  }
+};
+
+async function writeToKV(kv: KVNamespace, items: { key: string, value: string }[]) {
+  const promises = items.map(async ({ key, value }) => {
+    // 检查是否已存在
+    const exists = await kv.get(key);
+    if (!exists) {
+      await kv.put(key, value);
+      console.log(`Added: ${key}`);
+    }
+  });
+  await Promise.all(promises);
+}
