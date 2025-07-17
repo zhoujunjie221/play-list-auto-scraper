@@ -63,7 +63,7 @@ export default {
 
 async function writeToKV(kv: KVNamespace, items: { key: string, value: string }[]) {
   const promises = items.map(async ({ key, value }) => {
-    // 检查是否已存在
+    // 检查是否已存在，如果不存在则添加
     const exists = await kv.get(key);
     if (!exists) {
       await kv.put(key, value);
