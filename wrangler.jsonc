@@ -22,7 +22,7 @@
 		}
 	],
 	"vars": {
-		"KEYWORDS": "cash,loan,peso,pera,credit,lending",
+		"KEYWORDS": "cash,loan,peso,pera,credit,lending,mabilis",
 		"API_URL": "https://playapi.yuandao.world/api/apps/?collection=TOP_FREE&category=FINANCE&country=ph"
 	},
 	/**
